@@ -1,0 +1,222 @@
+#lang reader "compiler.rkt"
+print("Running...");
+
+//// Simple assert statements: will print an error message on failure
+def assert-eq(x, y)  { print("Assertion Failed: arguments are not equal!") };
+def assert-eq(x, =x) { x };
+def assert-ne(x, y)  { x };
+def assert-ne(x, =x) { print("Assertion Failed: arguments are equal!") };
+
+////====================================================////
+print("Running Section 1.1: The Mμl Programming Language");
+////====================================================////
+
+def foo(n) { n };
+// create three distinct identies
+bar := new; baz := new; qux := new; 
+assert-ne(bar, baz); assert-ne(bar, qux); assert-ne(baz, qux);
+assert-eq(foo(bar), bar); assert-eq(foo(baz), baz); assert-eq(foo(qux), qux); // evaluates to bar, baz and qux
+
+def foo(=bar) { baz };
+assert-eq(foo(bar), baz); // Now this evaluates to baz
+assert-eq(foo(qux), qux); // Still evaluates to qux, as qux ≠ bar
+
+def foo(x | foo2(x)) { foo2(x) };
+assert-eq(foo(bar), baz); // Still evaluates to baz, as foo2(bar) is undefined
+def foo2(=bar) { bar };
+
+assert-eq(foo(bar), bar); // now returns foo2(bar), which returns bar
+
+// Note: section 2.2 must appear before section 2.1, since the latter uses natural numbers
+////====================================================////
+print("Running Section 2.2: Value Equality");
+////====================================================////
+zero := new; // An identity simply representing the number 0
+
+def succ(n) { // returns an identity representing n + 1
+	res := new;
+	def succ(=n) { res }; // memoise the result
+	def pred(=res) { n };
+	res };
+
+assert-eq(succ(zero), succ(zero));
+
+////----------------------------------------------------////
+          
+def plus(x, =zero) { x }; // Since x + 0 = x
+def plus(x, y | pred(y)) {
+	// Since x + (y + 1) = (x + y) + 1
+	// This requires pred(y) to be defined (so y ≠ 0)
+	assert-ne(y, 0);
+	succ(plus(x, pred(y))) };
+
+one := succ(zero);
+def plus(x, =one) { // optimised case for x + 1
+	succ(x) };
+
+////----------------------------------------------------////
+
+empty := new; // The empty list
+def cons(h, t) { // like h : t in Haskell
+	res := new;
+	def cons(=h, =t) { res }; // memoise the result
+	def head(=res) { h }; def tail(=res) { t };
+	res };
+
+list1 := cons(1, empty); // Or [1]
+list2 := cons(1, empty); // Identical to list1
+assert-eq(list1, list2);
+
+////====================================================////
+print("Running Section 2.1: (Mutable) State");
+////====================================================////
+
+def new-point(x, y) { // a 'constructor' for a 'record'
+	res := new;
+	def get-x(=res) { x }; // a 'getter'
+	def get-y(=res) { y };
+	// res is like a {x = x, y = y} record
+	res };
+
+point := new-point(1, 2);
+assert-eq(get-x(point), 1); // returns 1, like point.x = 2
+
+////----------------------------------------------------////
+
+def get-x(=point) { 2 }; // like point.x = 2
+assert-eq(get-x(point), 2); // now returns 2
+
+////----------------------------------------------------////
+
+// can only call this method if get-x(that) is already defined
+def set-x(that, x | get-x(that)) {
+	def get-x(=that) { x } };
+
+set-x(point, 3);
+assert-eq(get-x(point), 3); // now returns 3
+
+////----------------------------------------------------////
+
+def global-set-x(x) {
+	def get-x(that) { x } };
+
+global-set-x(4);
+assert-eq(get-x(point), 4); // now returns 4
+
+////====================================================////
+print("Running Section 2.3: (Multiple) Dynamic Dispatch");
+////====================================================////
+
+def map(f, =empty) { empty };
+def map(f, l | head(l)) {
+	// Here l ≠ empty, since head(empty) is undefined
+	assert-ne(l, empty);
+	cons(apply(f, head(l)), map(f, tail(l))) };
+
+lam := new; // an identity to represent our lambda expression
+def apply(=lam, x) { plus(x, 1) }; // the body of the 'lambda'
+assert-eq(map(lam, [1, 2]), [2, 3]); // pass the 'lambda'
+
+////----------------------------------------------------////
+
+def as-natural(=zero) { zero };
+def as-natural(n | pred(n)) { n }; // n = succ(...)
+assert-eq(as-natural(3), 3); // as-natural(x) is defined iff x is a 'natural number'
+
+def as-list(=empty) { empty };
+def as-list(a | head(a), tail(a)) { a }; // a = cons(...)
+assert-eq(as-list([1, 2]), [1, 2]); // as-list(x) is defined iff x is a 'list'
+
+
+////----------------------------------------------------////
+
+// Note: zip-map(f, a, b) will get stuck if a and b have different lengths
+def zip-map(f, =empty, =empty) { empty };
+def zip-map(f, a, b | head(a), head(b)) {
+	cons(apply(f, head(a), head(b)), zip-map(f, tail(a), tail(b))) };
+
+////----------------------------------------------------////
+
+def add(x, y | as-natural(x), as-natural(y)) {
+	plus(x, y) };
+def add(x, y | as-list(x), as-list(y)) {
+	// Assuming zip-map is defined analogously to map
+	zip-map({xe, ye => add(xe, ye)}, x, y) };
+
+def add(x, y | as-list(x), as-natural(y)) {
+	map({xe => add(xe, y)}, x) };
+def add(x, y | as-natural(x), as-list(y)) {
+	map({ye => add(x, ye)}, y) };
+
+assert-eq(add([[1, 2], 3], 4), [[5, 6], 7]); // evaluates to [[5, 6], 7]
+
+////----------------------------------------------------////
+
+def make-add(x, y, res) {
+	def add(=x, =y) { res } };
+
+assert-eq(add(1, 1), 2); // returns 2
+make-add(1, 1, 3);
+assert-eq(add(1, 1), 3); // now returns 3
+
+////====================================================////
+print("Running Section 2.4: (Dynamic) Inheritance");
+////====================================================////
+
+def mammal-mixin(self) { // like a 'mammal' class/mixin
+	def as-mammal(=self) { self };
+	def tails(=self) { 1 };
+	def legs(=self) { 4 };
+	self };
+
+def biped-mixin(self) {
+	def as-biped(=self) { self };
+	def legs(=self) { 2 };
+	self };
+
+def kangaroo-mixin(self) {
+	mammal-mixin(self); // inherit tails and legs from 'mammal'
+	biped-mixin(self); // override with 'bipeds' legs method
+	// Note: biped-mixin(mammal-mixin(self)) would also work
+	def as-kangaroo(=self) { self };
+	def arms(=self) { 2 }; // extra method
+	self };
+
+k := kangaroo-mixin(new); // make a new 'kangaroo'
+assert-eq([tails(k), legs(k), arms(k)], [1, 2, 2]); // returns 1, 2, 2
+
+////----------------------------------------------------////
+
+mb := mammal-mixin(new);
+assert-eq(legs(mb), 4); // returns 4
+biped-mixin(mb); // Almost like adding a new 'class' to mb
+assert-eq(legs(mb), 2); // now returns 2
+
+////----------------------------------------------------////
+
+m := mammal-mixin(new);
+assert-eq([legs(m), legs(mb), legs(k)], [4, 2, 2]); // returns 4, 2, and 2
+def legs(self | as-biped(self)) { 3 };
+assert-eq([legs(m), legs(mb), legs(k)], [4, 3, 3]); // returns 4, 3, and 3
+
+////====================================================////
+print("Running Section 4: Future Work & Conclusion");
+////====================================================////
+
+def person() {
+	res := new; inner := new;
+	def message(=inner) { // a 'private' method
+		"Hello World" };
+	def speak(=res) { // a 'public' method
+		print(message(inner)) };
+	res };
+
+p := person();
+speak(p); // Ok, prints "Hello World"
+//message(p); // Error
+def message(x) { "Goodbye World" };
+speak(p); // Now prints "Goodbye World"
+
+print("Finished!")
+
+//EOF
