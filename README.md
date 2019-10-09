@@ -7,6 +7,7 @@ A prototype implementation of the Mμl multi-method programming language, as des
 5. Wait for your code to finish running, the implementation is quite slow, so be patient!
 
 # Files:
+0. `multi-methods.pdf`: the paper.
 1. `compiler.rkt`: a "compiler" that can be used with rackets `#lang` directive, it will lex, parse and desugar a Mμl file into an AST, that is then wrappep into racket code, that when executed will parse the Mμl ast to our redex implementation (see below).
 2. `grammar.rkt`: the production rules for the grammar (written in brag)
 3. `runtime.rkt`: the "runtime", a straightforward implementation of our reduction rules, written in PLT Redex.
