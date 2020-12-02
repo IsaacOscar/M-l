@@ -47,7 +47,7 @@
     [`(Nat ,n)  ; succ( ... succ(zero)...), with n "succ"s
      (for/fold ([res 'zero]) ([_ (in-range (string->number n))]) `[Call succ ,res])]
     [`(List ,e ...) ; List e1 ... en = cons(e1, ... cons(en, empty)))
-     (Desugar (for/fold ([res 'empty]) ([x e]) `[Call cons ,x ,res]))]
+     (Desugar (for/foldr ([res 'empty]) ([x e]) `[Call cons ,x ,res]))]
     [`(Lamb ,ps ,e) ; l := new; def apply(=l, ps...) { e }; l
      ; $l need not be fresh, because it can't clash with any identifier the user wrote in e
      ; and it will simply shadow any other $l's for any enclosing lambdas
